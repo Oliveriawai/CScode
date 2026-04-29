@@ -16,21 +16,18 @@ def load_database(db_path):
     return database
 
 def main():
-    # 初始化设备
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"使用设备: {device}")
     
-    # 初始化 MTCNN 和 FaceNet
     mtcnn = MTCNN(image_size=160, margin=0, device=device, keep_all=True)
     resnet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
     
-    # 加载数据库
-    database = load_database("step3_open_set/face_database.pt")
+    # ========== 修改这里 ==========
+    database = load_database("face_database.pt")  # 改成当前目录下的文件
+    # =============================
     
-    # 识别阈值
-    threshold = 0.80
+    threshold = 0.75
     
-    # 打开摄像头
     print("\n正在打开摄像头...")
     cap = cv2.VideoCapture(0)
     
@@ -50,11 +47,9 @@ def main():
             print("无法获取画面")
             break
         
-        # 转换 BGR 到 RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(rgb_frame)
         
-        # 检测人脸
         boxes, probs = mtcnn.detect(pil_img)
         
         if boxes is not None:
@@ -63,18 +58,14 @@ def main():
                     continue
                 
                 x1, y1, x2, y2 = [int(coord) for coord in box]
-                
-                # 提取人脸（返回 [C, H, W] 格式）
-                face_tensor = mtcnn(pil_img)  # 返回 [N, C, H, W]
+                face_tensor = mtcnn(pil_img)
                 
                 if face_tensor is not None and i < len(face_tensor):
-                    # 取第 i 个人脸，添加 batch 维度 [1, C, H, W]
                     single_face = face_tensor[i].unsqueeze(0).to(device)
                     
                     with torch.no_grad():
                         embedding = resnet(single_face).cpu().numpy()[0]
                     
-                    # 与数据库匹配
                     best_sim = -1
                     best_name = None
                     for name, data in database.items():
@@ -83,12 +74,11 @@ def main():
                             sim = max(sims)
                         else:
                             sim = cosine_similarity(embedding, data['embedding'])
-    
+                        
                         if sim > best_sim:
                             best_sim = sim
                             best_name = name
                     
-                    # 判断是否认识
                     if best_sim >= threshold:
                         label = f"{best_name} ({best_sim:.2f})"
                         color = (0, 255, 0)
@@ -96,12 +86,10 @@ def main():
                         label = f"Unknown ({best_sim:.2f})"
                         color = (0, 165, 255)
                     
-                    # 绘制人脸框和标签
                     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                     cv2.putText(frame, label, (x1, y1-10), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         
-        # 显示 FPS
         fps_counter += 1
         current_time = time.time()
         if current_time - last_time >= 1.0:
@@ -111,10 +99,8 @@ def main():
             cv2.putText(frame, f"FPS: {fps}", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
-        # 显示画面
         cv2.imshow('Face Recognition - Press q to quit', frame)
         
-        # 按键控制
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
