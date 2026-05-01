@@ -461,7 +461,7 @@ def main():
         'max_area_highlight': 5000,
         'intensity_threshold': 210,
         'texture_window_size': 25,
-        'texture_variance_threshold': 4.0,
+        'texture_variance_threshold': 4,
         'min_area_texture': 150,
         'max_area_texture': 15000,
         'gradient_threshold': 70,
